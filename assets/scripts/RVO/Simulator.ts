@@ -4,13 +4,10 @@ import KdTree from "./KdTree";
 import Obstacle from "./Obstacle";
 import RVOMath from "./RVOMath";
 
-export default class Simulator
-{
+export default class Simulator {
     private static _instance: Simulator;
-    public static get Instance()
-    {
-        if (!Simulator._instance)
-        {
+    public static get Instance() {
+        if (!Simulator._instance) {
             Simulator._instance = new Simulator();
         }
         return Simulator._instance;
@@ -24,12 +21,10 @@ export default class Simulator
     public timeStep_: number;
     private defaultAgent_: Agent;
     private globalTime_: number;
-    constructor()
-    {
+    constructor() {
         this.init();
     }
-    private init()
-    {
+    private init() {
         this.agents_ = [];
         this.agentNo2indexDict_ = new Map();
         this.index2agentNoDict_ = new Map();
@@ -39,31 +34,25 @@ export default class Simulator
         this.globalTime_ = 0;
         this.timeStep_ = 0.1;
     }
-    public doStep()
-    {
+    public doStep() {
         this.updateDeleteAgent();
         this.kdTree_.buildAgentTree();
-        for (let i = 0, j = this.agents_.length; i < j; i++)
-        {
+        for (let i = 0, j = this.agents_.length; i < j; i++) {
             let agent = this.agents_[i];
             agent.computeNeighbors();
             agent.computeNewVelocity();
         }
-        for (let i = 0, j = this.agents_.length; i < j; i++)
-        {
+        for (let i = 0, j = this.agents_.length; i < j; i++) {
             let agent = this.agents_[i];
             agent.update();
         }
         this.globalTime_ += this.timeStep_;
         return this.globalTime_;
     }
-    private updateDeleteAgent()
-    {
+    private updateDeleteAgent() {
         let isDelete = false;
-        for (let i = this.agents_.length - 1; i >= 0; i--)
-        {
-            if (this.agents_[i].needDelete_)
-            {
+        for (let i = this.agents_.length - 1; i >= 0; i--) {
+            if (this.agents_[i].needDelete_) {
                 this.agents_.splice(i, 1);
                 isDelete = true;
             }
@@ -71,8 +60,7 @@ export default class Simulator
         if (isDelete)
             this.onDelAgent();
     }
-    public addAgent(position: Vec2)
-    {
+    public addAgent(position: Vec2) {
         if (this.defaultAgent_ == null) return -1;
         let agent = new Agent();
         agent.id_ = Simulator.s_totalID;
@@ -89,30 +77,24 @@ export default class Simulator
         this.onAddAgent();
         return agent.id_;
     }
-    public addObstacle(vertices: Array<Vec2>)
-    {
+    public addObstacle(vertices: Array<Vec2>) {
         if (vertices.length < 2) return -1;
         let obstacleNo = this.obstacles_.length;
-        for (let i = 0; i < vertices.length; ++i)
-        {
+        for (let i = 0; i < vertices.length; ++i) {
             let obstacle = new Obstacle();
             obstacle.point_ = vertices[i];
-            if (i != 0)
-            {
+            if (i != 0) {
                 obstacle.previous_ = this.obstacles_[this.obstacles_.length - 1];
                 obstacle.previous_.next_ = obstacle;
             }
-            if (i == vertices.length - 1)
-            {
+            if (i == vertices.length - 1) {
                 obstacle.next_ = this.obstacles_[obstacleNo];
                 obstacle.next_.previous_ = obstacle;
             }
-            obstacle.direction_ = RVOMath.normalize(Vec2.subtract(vertices[(i == vertices.length - 1 ? 0 : i + 1)], vertices[i]));
-            if (vertices.length == 2)
-            {
+            obstacle.direction_ = vertices[(i == vertices.length - 1 ? 0 : i + 1)].clone().subtract(vertices[i]).normalize();
+            if (vertices.length == 2) {
                 obstacle.convex_ = true;
-            } else
-            {
+            } else {
                 obstacle.convex_ = (RVOMath.leftOf(vertices[(i == 0 ? vertices.length - 1 : i - 1)], vertices[i], vertices[(i == vertices.length - 1 ? 0 : i + 1)]) >= 0);
             }
             obstacle.id_ = this.obstacles_.length;
@@ -120,19 +102,16 @@ export default class Simulator
         }
         return obstacleNo;
     }
-    private onDelAgent()
-    {
+    private onDelAgent() {
         this.agentNo2indexDict_.clear();
         this.index2agentNoDict_.clear();
-        for (let i = 0; i < this.agents_.length; i++)
-        {
+        for (let i = 0; i < this.agents_.length; i++) {
             let agentNo = this.agents_[i].id_;
             this.agentNo2indexDict_.set(agentNo, i);
             this.index2agentNoDict_.set(i, agentNo);
         }
     }
-    private onAddAgent()
-    {
+    private onAddAgent() {
         if (this.agents_.length == 0)
             return;
         let index = this.agents_.length - 1;
@@ -140,29 +119,22 @@ export default class Simulator
         this.agentNo2indexDict_.set(agentNo, index);
         this.index2agentNoDict_.set(index, agentNo);
     }
-    public getAgentPosition(agentNo: number)
-    {
+    public getAgentPosition(agentNo: number) {
         let agent = this.agents_[this.agentNo2indexDict_.get(agentNo)];
-        if (agent)
-        {
+        if (agent) {
             return agent.position_;
-        } else
-        {
+        } else {
             return new Vec2(0, 0);
         }
     }
-    public getAgentPrefVelocity(agentNo: number)
-    {
+    public getAgentPrefVelocity(agentNo: number) {
         return this.agents_[this.agentNo2indexDict_.get(agentNo)].prefVelocity_;
     }
-    public setTimeStep(timeStep: number)
-    {
+    public setTimeStep(timeStep: number) {
         this.timeStep_ = timeStep;
     }
-    public setAgentDefaults(neighborDist: number, maxNeighbors: number, timeHorizon: number, timeHorizonObst: number, radius: number, maxSpeed: number, velocity: Vec2)
-    {
-        if (this.defaultAgent_ == null)
-        {
+    public setAgentDefaults(neighborDist: number, maxNeighbors: number, timeHorizon: number, timeHorizonObst: number, radius: number, maxSpeed: number, velocity: Vec2) {
+        if (this.defaultAgent_ == null) {
             this.defaultAgent_ = new Agent();
         }
         this.defaultAgent_.maxNeighbors_ = maxNeighbors;
@@ -173,12 +145,10 @@ export default class Simulator
         this.defaultAgent_.timeHorizonObst_ = timeHorizonObst;
         this.defaultAgent_.velocity_ = velocity;
     }
-    public processObstacles()
-    {
+    public processObstacles() {
         this.kdTree_.buildObstacleTree();
     }
-    public setAgentPrefVelocity(agentNo: number, prefVelocity: Vec2)
-    {
+    public setAgentPrefVelocity(agentNo: number, prefVelocity: Vec2) {
         this.agents_[this.agentNo2indexDict_.get(agentNo)].prefVelocity_ = prefVelocity;
     }
 }
