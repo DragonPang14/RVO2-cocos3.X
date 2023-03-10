@@ -181,9 +181,9 @@ export default class Agent {
                 continue;
             }
 
-            let distSqCutoff = (t < 0 || t > 1 || obstacle1 == obstacle2) ? RVOMath.RVO_POSITIVEINFINITY : RVOMath.absSq(Vec2.subtract(this.velocity_, Vec2.addition(leftCutOff, Vec2.multiply2(t, cutOffVector))));
-            let distSqLeft = tLeft < 0 ? RVOMath.RVO_POSITIVEINFINITY : RVOMath.absSq(Vec2.subtract(this.velocity_, Vec2.addition(leftCutOff, Vec2.multiply2(tLeft, leftLegDirection))));
-            let distSqRight = tRight < 0 ? RVOMath.RVO_POSITIVEINFINITY : RVOMath.absSq(Vec2.subtract(this.velocity_, Vec2.addition(rightCutOff, Vec2.multiply2(tRight, rightLegDirection))));
+            let distSqCutoff = (t < 0 || t > 1 || obstacle1 == obstacle2) ? RVOMath.RVO_POSITIVEINFINITY : RVOMath.absSq(this.velocity_.clone().subtract( leftCutOff.clone().add(cutOffVector.clone().multiplyScalar(t))));
+            let distSqLeft = tLeft < 0 ? RVOMath.RVO_POSITIVEINFINITY : RVOMath.absSq(this.velocity_.clone().subtract(leftCutOff.clone().add(leftLegDirection.clone().multiplyScalar(tLeft))));
+            let distSqRight = tRight < 0 ? RVOMath.RVO_POSITIVEINFINITY : RVOMath.absSq(this.velocity_.clone().subtract(rightCutOff.clone().add(rightLegDirection.clone().multiplyScalar(tRight))));
 
             if (distSqCutoff <= distSqLeft && distSqCutoff <= distSqRight) {
                 line.direction = obstacle1.direction_.clone().multiplyScalar(-1);
@@ -231,27 +231,27 @@ export default class Agent {
                     let wLength = RVOMath.sqrt(wLengthSq);
                     let unitW = RVOMath.divisionScalar(w, wLength);
                     line.direction = new Vec2(unitW.y, -unitW.x);
-                    u = Vec2.multiply2(combinedRadius * invTimeHorizon - wLength, unitW);
+                    u = unitW.clone().multiplyScalar(combinedRadius * invTimeHorizon - wLength);
                 } else {
                     let leg = RVOMath.sqrt(distSq - combinedRadiusSq);
                     if (RVOMath.det(relativePosition, w) > 0) {
-                        line.direction = Vec2.division(new Vec2(relativePosition.x * leg - relativePosition.y * combinedRadius, relativePosition.x * combinedRadius + relativePosition.y * leg), distSq);
+                        line.direction = RVOMath.divisionScalar(new Vec2(relativePosition.x * leg - relativePosition.y * combinedRadius, relativePosition.x * combinedRadius + relativePosition.y * leg), distSq);
                     } else {
-                        line.direction = Vec2.division(new Vec2(relativePosition.x * leg + relativePosition.y * combinedRadius, -relativePosition.x * combinedRadius + relativePosition.y * leg), -distSq);
+                        line.direction = RVOMath.divisionScalar(new Vec2(relativePosition.x * leg + relativePosition.y * combinedRadius, -relativePosition.x * combinedRadius + relativePosition.y * leg), -distSq);
                     }
 
-                    let dotProduct2 = Vec2.multiply(relativeVelocity, line.direction);
-                    u = Vec2.subtract(Vec2.multiply2(dotProduct2, line.direction), relativeVelocity);
+                    let dotProduct2 = RVOMath.absSq2(relativeVelocity, line.direction);
+                    u = line.direction.clone().multiplyScalar(dotProduct2).subtract(relativeVelocity);
                 }
             } else {
                 let invTimeStep = 1 / Simulator.Instance.timeStep_;
-                let w = Vec2.subtract(relativeVelocity, Vec2.multiply2(invTimeStep, relativePosition));
+                let w = relativeVelocity.clone().subtract(relativePosition.clone().multiplyScalar(invTimeStep));
                 let wLength = RVOMath.abs(w);
-                let unitW = Vec2.division(w, wLength);
+                let unitW = RVOMath.divisionScalar(w, wLength);
                 line.direction = new Vec2(unitW.y, -unitW.x);
-                u = Vec2.multiply2(combinedRadius * invTimeStep - wLength, unitW);
+                u = unitW.clone().multiplyScalar(combinedRadius * invTimeStep - wLength);
             }
-            line.point = Vec2.addition(this.velocity_, Vec2.multiply2(0.5, u));
+            line.point = this.velocity_.clone().add(u.clone().multiplyScalar(0.5));
             this.orcaLines_[this.orcaLines_.length] = line;
         }
         let tempVelocity_ = new ObserverObj<Vec2>(new Vec2(this.newVelocity_.x, this.newVelocity_.y));
@@ -262,7 +262,7 @@ export default class Agent {
         this.newVelocity_ = tempVelocity_.value;
     }
     private linearProgram1(lines: Array<Line>, lineNo: number, radius: number, optVelocity: Vec2, directionOpt: boolean, result: ObserverObj<Vec2>): boolean {
-        let dotProduct = Vec2.multiply(lines[lineNo].point, lines[lineNo].direction);
+        let dotProduct = RVOMath.absSq2(lines[lineNo].point, lines[lineNo].direction);
         let discriminant = RVOMath.sqr(dotProduct) + RVOMath.sqr(radius) - RVOMath.absSq(lines[lineNo].point);
         if (discriminant < 0) {
             return false;
@@ -272,7 +272,7 @@ export default class Agent {
         let tRight = -dotProduct + sqrtDiscriminant;
         for (let i = 0; i < lineNo; ++i) {
             let denominator = RVOMath.det(lines[lineNo].direction, lines[i].direction);
-            let numerator = RVOMath.det(lines[i].direction, Vec2.subtract(lines[lineNo].point, lines[i].point));
+            let numerator = RVOMath.det(lines[i].direction, lines[lineNo].point.clone().subtract(lines[i].point));
             if (RVOMath.fabs(denominator) <= RVOMath.RVO_EPSILON) {
                 if (numerator < 0) {
                     return false;
@@ -290,19 +290,19 @@ export default class Agent {
             }
         }
         if (directionOpt) {
-            if (Vec2.multiply(optVelocity, lines[lineNo].direction) > 0) {
-                result.value = Vec2.addition(lines[lineNo].point, Vec2.multiply2(tRight, lines[lineNo].direction));
+            if (RVOMath.absSq2(optVelocity, lines[lineNo].direction) > 0) {
+                result.value = lines[lineNo].point.clone().add(lines[lineNo].direction.clone().multiplyScalar(tRight));
             } else {
-                result.value = Vec2.addition(lines[lineNo].point, Vec2.multiply2(tLeft, lines[lineNo].direction));
+                result.value = lines[lineNo].point.clone().add( lines[lineNo].direction.clone().multiplyScalar(tLeft));
             }
         } else {
-            let t = Vec2.multiply(lines[lineNo].direction, Vec2.subtract(optVelocity, lines[lineNo].point));
+            let t = RVOMath.absSq2(lines[lineNo].direction, optVelocity.clone().subtract(lines[lineNo].point));
             if (t < tLeft) {
-                result.value = Vec2.addition(lines[lineNo].point, Vec2.multiply2(tLeft, lines[lineNo].direction));
+                result.value = lines[lineNo].point.clone().add(lines[lineNo].direction.clone().multiplyScalar(tLeft));
             } else if (t > tRight) {
-                result.value = Vec2.addition(lines[lineNo].point, Vec2.multiply2(tRight, lines[lineNo].direction));
+                result.value = lines[lineNo].point.clone().add(lines[lineNo].direction.clone().multiplyScalar(tRight));
             } else {
-                result.value = Vec2.addition(lines[lineNo].point, Vec2.multiply2(t, lines[lineNo].direction));
+                result.value = lines[lineNo].point.clone().add(lines[lineNo].direction.clone().multiplyScalar(t));
             }
         }
 
@@ -311,15 +311,15 @@ export default class Agent {
 
     private linearProgram2(lines: Array<Line>, radius: number, optVelocity: Vec2, directionOpt: boolean, result: ObserverObj<Vec2>): number {
         if (directionOpt) {
-            result.value = Vec2.multiply2(radius, optVelocity);
+            result.value = optVelocity.clone().multiplyScalar(radius);
         } else if (RVOMath.absSq(optVelocity) > RVOMath.sqr(radius)) {
-            result.value = Vec2.multiply2(radius, RVOMath.normalize(optVelocity));
+            result.value = optVelocity.clone().normalize().multiplyScalar(radius);
         } else {
             result.value = optVelocity;
         }
 
         for (let i = 0; i < lines.length; ++i) {
-            if (RVOMath.det(lines[i].direction, Vec2.subtract(lines[i].point, result.value)) > 0) {
+            if (RVOMath.det(lines[i].direction, lines[i].point.clone().subtract(result.value)) > 0) {
                 let tempResult = new Vec2(result.value.x, result.value.y);
                 if (!this.linearProgram1(lines, i, radius, optVelocity, directionOpt, result)) {
                     result.value = tempResult;
@@ -332,7 +332,7 @@ export default class Agent {
     private linearProgram3(lines: Array<Line>, numObstLines: number, beginLine: number, radius: number, result: ObserverObj<Vec2>) {
         let distance = 0;
         for (let i = beginLine; i < lines.length; ++i) {
-            if (RVOMath.det(lines[i].direction, Vec2.subtract(lines[i].point, result.value)) > distance) {
+            if (RVOMath.det(lines[i].direction, result.value.clone().subtract(lines[i].point)) > distance) {
                 let projLines: Array<Line> = [];
                 for (let ii = 0; ii < numObstLines; ++ii) {
                     projLines[projLines.length] = lines[ii];
@@ -341,22 +341,22 @@ export default class Agent {
                     let line = new Line();
                     let determinant = RVOMath.det(lines[i].direction, lines[j].direction);
                     if (RVOMath.fabs(determinant) <= RVOMath.RVO_EPSILON) {
-                        if (Vec2.multiply(lines[i].direction, lines[j].direction) > 0.0) {
+                        if (RVOMath.absSq2(lines[i].direction, lines[j].direction) > 0.0) {
                             continue;
                         } else {
-                            line.point = Vec2.multiply2(0.5, Vec2.addition(lines[i].point, lines[j].point));
+                            line.point = lines[i].point.clone().add(lines[j].point).multiplyScalar(0.5);
                         }
                     } else {
-                        line.point = Vec2.addition(lines[i].point, Vec2.multiply2(RVOMath.det(lines[j].direction, Vec2.subtract(lines[i].point, lines[j].point)) / determinant, lines[i].direction));
+                        line.point = lines[i].point.clone().add(lines[i].direction.multiplyScalar(RVOMath.det(lines[j].direction, lines[j].point.clone().subtract(lines[i].point)) / determinant));
                     }
-                    line.direction = RVOMath.normalize(Vec2.subtract(lines[j].direction, lines[i].direction));
+                    line.direction = lines[i].direction.clone().subtract(lines[j].direction).normalize();
                     projLines[projLines.length] = line;
                 }
                 let tempResult = new Vec2(result.value.x, result.value.y);
                 if (this.linearProgram2(projLines, radius, new Vec2(-lines[i].direction.y, lines[i].direction.x), true, result) < projLines.length) {
                     result.value = tempResult;
                 }
-                distance = RVOMath.det(lines[i].direction, Vec2.subtract(lines[i].point, result.value));
+                distance = RVOMath.det(lines[i].direction, result.value.clone().subtract(lines[i].point));
             }
         }
     }
